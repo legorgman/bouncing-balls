@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bouncing Ball Game</title>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+  }
+  .ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px;
+  }
+  .canvas-container {
+    flex-basis: 60%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  canvas {
+    border: 1px solid #333;
+  }
+  .ui-left, .ui-right {
+    flex-basis: 20%;
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .control-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .button-container {
+    display: flex;
+    align-items: center;
+  }
+  .button-container button {
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    margin: 0 5px;
+  }
+  .value-display {
+    width: 50px;
+    text-align: center;
+  }
+  .instructions {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    font-size: 14px;
+    color: #333;
+    line-height: 1.5;
+    max-width: 250px;
+  }
+</style>
+</head>
+<body>
+<div class="ui-container">
+  <div class="ui-left">
+    <button id="startButton">Start Game</button>
+    <button id="restartButton">Restart</button>
+    <label>Ball Color: <input type="color" id="ballColor" value="#0077ff"></label>
+
+    <div class="control-group">
+      <label for="ballSizeChange">Ball Size</label>
+      <div class="button-container">
+        <button id="ballSizeDecrease">-</button>
+        <span class="value-display" id="ballSizeValue">0</span>
+        <button id="ballSizeIncrease">+</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="circleSizeChange">Circle Size</label>
+      <div class="button-container">
+        <button id="circleSizeDecrease">-</button>
+        <span class="value-display" id="circleSizeValue">0</span>
+        <button id="circleSizeIncrease">+</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="gravityControl">Gravity</label>
+      <div class="button-container">
+        <button id="gravityDecrease">-</button>
+        <span class="value-display" id="gravityValue">0.1</span>
+        <button id="gravityIncrease">+</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="velocityControl">Velocity</label>
+      <div class="button-container">
+        <button id="velocityDecrease">-</button>
+        <span class="value-display" id="velocityValue">1.0</span>
+        <button id="velocityIncrease">+</button>
+      </div>
+    </div>
+
+    <button id="addBallButton">Add Ball</button>
+  </div>
+  <div class="canvas-container">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<div class="instructions">
+  <h4>Instructions:</h4>
+  <ul>
+    <li><strong>Start Game:</strong> Begins the game and starts ball physics.</li>
+    <li><strong>Restart:</strong> Restarts the game and resets all values.</li>
+    <li><strong>Ball Color:</strong> Changes the ball color.</li>
+    <li><strong>Ball Size:</strong> Adjusts the size of the ball upon collision (+/-).</li>
+    <li><strong>Circle Size:</strong> Adjusts the size of the circle upon collision (+/-).</li>
+    <li><strong>Gravity:</strong> Adjusts the gravity pull on the ball (+/-).</li>
+    <li><strong>Velocity:</strong> Adjusts the velocity of the ball (+/-).</li>
+    <li><strong>Add Ball:</strong> Adds a new ball to the game.</li>
+  </ul>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let width = window.innerWidth * 0.6;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
+
+const maxRadius = Math.min(width, height) * 0.4;
+let circleRadius = maxRadius;
+
+const balls = [];
+let ballRadius = 10;
+let gravity = 0.1;
+let velocityMultiplier = 1.0;
+let bounceCount = 0;
+let isGameRunning = false;
+
+// Default reset values
+const defaultBallSizeChange = 0;
+const defaultCircleSizeChange = 0;
+const defaultGravity = 0.1;
+const defaultVelocityMultiplier = 1.0;
+
+let ballSizeChange = defaultBallSizeChange;
+let circleSizeChange = defaultCircleSizeChange;
+
+// Initialize game
+function initializePreview() {
+  balls.length = 0;
+  addBall();
+  circleRadius = maxRadius;
+  ballSizeChange = defaultBallSizeChange;
+  circleSizeChange = defaultCircleSizeChange;
+  gravity = defaultGravity;
+  velocityMultiplier = defaultVelocityMultiplier;
+  bounceCount = 0;
+  isGameRunning = false;
+  document.getElementById("ballSizeValue").textContent = ballSizeChange.toFixed(1);
+  document.getElementById("circleSizeValue").textContent = circleSizeChange.toFixed(1);
+  document.getElementById("gravityValue").textContent = gravity.toFixed(1);
+  document.getElementById("velocityValue").textContent = velocityMultiplier.toFixed(1);
+  drawPreview();
+}
+
+// Add a new ball
+function addBall() {
+  const angle = Math.random() * Math.PI * 2;
+  const distance = Math.random() * (circleRadius - ballRadius) * 0.8;
+  const x = width / 2 + Math.cos(angle) * distance;
+  const y = height / 2 + Math.sin(angle) * distance;
+
+  balls.push({
+    x,
+    y,
+    dx: (Math.random() * 2 + 1) * (Math.random() < 0.5 ? 1 : -1),
+    dy: (Math.random() * 2 + 1) * (Math.random() < 0.5 ? 1 : -1),
+    color: document.getElementById("ballColor").value,
+    radius: ballRadius,
+  });
+}
+
+// Draw the circle
+function drawCircle() {
+  ctx.beginPath();
+  ctx.arc(width / 2, height / 2, circleRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.closePath();
+}
+
+// Draw balls
+function drawBalls() {
+  balls.forEach((ball) => {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fillStyle = ball.color;
+    ctx.fill();
+    ctx.closePath();
+  });
+}
+
+// Update ball physics
+function updateBalls() {
+  balls.forEach((ball) => {
+    ball.dy += gravity;
+    ball.x += ball.dx * velocityMultiplier;
+    ball.y += ball.dy * velocityMultiplier;
+
+    const distToCenter = Math.hypot(ball.x - width / 2, ball.y - height / 2);
+    if (distToCenter + ball.radius > circleRadius) {
+      const normalX = (ball.x - width / 2) / distToCenter;
+      const normalY = (ball.y - height / 2) / distToCenter;
+
+      const dotProduct = ball.dx * normalX + ball.dy * normalY;
+      ball.dx -= 2 * dotProduct * normalX;
+      ball.dy -= 2 * dotProduct * normalY;
+
+      const overlap = distToCenter + ball.radius - circleRadius;
+      ball.x -= normalX * overlap;
+      ball.y -= normalY * overlap;
+
+      // Adjust ball and circle size based on controls
+      if (ballSizeChange !== 0) {
+        ball.radius *= (1 + ballSizeChange / 100);
+      }
+
+      if (circleSizeChange !== 0) {
+        circleRadius *= (1 + circleSizeChange / 100);
+      }
+
+      // Increase velocity on bounce (stacked multiplier)
+      bounceCount++;
+      velocityMultiplier = Math.pow(1.01, bounceCount);
+    }
+  });
+}
+
+// Draw everything
+function drawPreview() {
+  ctx.clearRect(0, 0, width, height);
+  drawCircle();
+  drawBalls();
+}
+
+// Animation loop
+function gameLoop() {
+  if (isGameRunning) {
+    updateBalls();
+    drawPreview();
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+// Event Listeners for UI controls
+document.getElementById("startButton").addEventListener("click", () => {
+  isGameRunning = true;
+  gameLoop();
+});
+
+document.getElementById("restartButton").addEventListener("click", initializePreview);
+
+document.getElementById("ballSizeDecrease").addEventListener("click", () => {
+  ballSizeChange = Math.max(-5, ballSizeChange - 0.1);
+  document.getElementById("ballSizeValue").textContent = ballSizeChange.toFixed(1);
+});
+
+document.getElementById("ballSizeIncrease").addEventListener("click", () => {
+  ballSizeChange = Math.min(5, ballSizeChange + 0.1);
+  document.getElementById("ballSizeValue").textContent = ballSizeChange.toFixed(1);
+});
+
+document.getElementById("circleSizeDecrease").addEventListener("click", () => {
+  circleSizeChange = Math.max(-5, circleSizeChange - 0.1);
+  document.getElementById("circleSizeValue").textContent = circleSizeChange.toFixed(1);
+});
+
+document.getElementById("circleSizeIncrease").addEventListener("click", () => {
+  circleSizeChange = Math.min(5, circleSizeChange + 0.1);
+  document.getElementById("circleSizeValue").textContent = circleSizeChange.toFixed(1);
+});
+
+document.getElementById("gravityDecrease").addEventListener("click", () => {
+  gravity = Math.max(-2.0, gravity - 0.1);
+  document.getElementById("gravityValue").textContent = gravity.toFixed(1);
+});
+
+document.getElementById("gravityIncrease").addEventListener("click", () => {
+  gravity = Math.min(2.0, gravity + 0.1);
+  document.getElementById("gravityValue").textContent = gravity.toFixed(1);
+});
+
+document.getElementById("velocityDecrease").addEventListener("click", () => {
+  velocityMultiplier = Math.max(0.1, velocityMultiplier - 0.1);
+  document.getElementById("velocityValue").textContent = velocityMultiplier.toFixed(1);
+});
+
+document.getElementById("velocityIncrease").addEventListener("click", () => {
+  velocityMultiplier = Math.min(5.0, velocityMultiplier + 0.1);
+  document.getElementById("velocityValue").textContent = velocityMultiplier.toFixed(1);
+});
+
+document.getElementById("addBallButton").addEventListener("click", addBall);
+
+// Initialize game
+initializePreview();
+</script>
+</body>
+</html>
